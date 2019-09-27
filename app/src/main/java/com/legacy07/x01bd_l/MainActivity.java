@@ -16,6 +16,7 @@ import android.os.Build;
 import android.os.Environment;
 import android.os.Handler;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -36,7 +37,7 @@ public class MainActivity extends AppCompatActivity {
     Button findfile, extr, nextp;
     TextView path, banner;
     ProgressDialog progressDialog;
-    String pathname, filename, fpath = "";
+    String filename, fpath = "";
     boolean success = false;
     private static final int FILE_SELECT_CODE = 0;
     assetmanager am = new assetmanager();
@@ -44,6 +45,8 @@ public class MainActivity extends AppCompatActivity {
     AlertDialog.Builder b;
     int action = 0;
     Animation aniBlink;
+    private String backupfpath;
+    public static final int PERMISSION_EXTERNAL_STORAGE = 1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,6 +66,21 @@ public class MainActivity extends AppCompatActivity {
             //File write logic here
         }
         isStoragePermissionGranted();
+
+        ActivityCompat.requestPermissions(MainActivity.this,
+                new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                PERMISSION_EXTERNAL_STORAGE);
+
+        int ReadExternalStoragePermission = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE);
+        Log.e("perm", "checkExternalStoragePermission() done");
+        if(ReadExternalStoragePermission== PackageManager.PERMISSION_GRANTED) {
+            Log.e("perm", "ReadExternalStoragePermission() granted");
+
+            //read my file in  /sdcard/test.csv
+
+        }
+
+
         runcommand("rm -rf storage/emulated/0/X01BD-StockRom-Patch");
 
 
@@ -89,18 +107,12 @@ public class MainActivity extends AppCompatActivity {
                 myOpenZipPicker();
 
             b.setTitle("Select an Action")
-                    .setNeutralButton("Extract Firmware", new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            action = 2;
-                        }
-                    })
-                    .setPositiveButton("Patch StockRom", new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            action = 1;
-                        }
-                    }).show().create();
+                    .setNeutralButton("Extract Firmware", (dialog, which) -> action = 2)
+                    .setPositiveButton("Patch StockRom", (dialog, which) -> action = 1)
+                    .setCancelable(false)
+                    .setIcon(R.drawable.logo)
+                    .create()
+                    .show();
 
         });
 
@@ -191,6 +203,10 @@ public class MainActivity extends AppCompatActivity {
                 // Get the path
                 fpath = uri.getPath();
                 assert fpath != null;
+                backupfpath = fpath;
+                backupfpath = backupfpath.replace("/document/", "storage/");
+                backupfpath = backupfpath.replace(":", "/");
+                Log.d("real file path", "File Path: " + fpath);
                 if (fpath.contains(":")) {
                     String currentpath = fpath;
                     String[] separated = currentpath.split(":");
@@ -198,6 +214,7 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 if (!fpath.equals("")) {
+
                     filename = fpath.substring(fpath.lastIndexOf("/") + 1);
                     success = true;
                     path.setVisibility(View.VISIBLE);
@@ -214,12 +231,28 @@ public class MainActivity extends AppCompatActivity {
                         fpath = s.toString();
                     }
                     Log.d("file path", "File Path: " + fpath);
-                    //  Log.d("file path", "File Path: " + runcommand("unzip -l " + fpath));
-                    findfile.setVisibility(View.INVISIBLE);
-                    extr.setVisibility(View.VISIBLE);
+
+                        if (checkforfile(fpath)) {
+                            //  Log.d("file path", "File Path: " + runcommand("unzip -l " + fpath));
+                            findfile.setVisibility(View.INVISIBLE);
+                            extr.setVisibility(View.VISIBLE);
+                        }
+                        else if (checkforfile(backupfpath))
+                        {
+                            findfile.setVisibility(View.INVISIBLE);
+                            path.setText("Under development :(");
+                            nextp.setVisibility(View.VISIBLE);
+                        }
+                        else{
+                            Log.d("file path", "File Path: " + fpath);
+                            Log.d("backupfile path", "File Path: " + backupfpath);
+                            path.setText("Something went wrong. Unable to get the file path. Try a different location :(");
+                            findfile.setVisibility(View.INVISIBLE);
+                            nextp.setVisibility(View.VISIBLE);
+                        }
+
 
                 } else {
-                    path.setTextSize(20);
                     path.setText("Something went wrong :(");
                 }
 
@@ -252,6 +285,7 @@ public class MainActivity extends AppCompatActivity {
             runcommand("rm -f storage/emulated/0/X01BD-StockRom-Patch/system.patch.dat");
             runcommand("rm -f storage/emulated/0/X01BD-StockRom-Patch/vendor.patch.dat");
             runcommand("rm -f storage/emulated/0/X01BD-StockRom-Patch/boot.img");
+            runcommand("rm -f storage/emulated/0/X01BD-StockRom-Patch/file_contexts.bin");
             runcommand("rm -f storage/emulated/0/X01BD-StockRom-Patch/compatibility.zip");
             runcommand("rm -f storage/emulated/0/X01BD-StockRom-Patch/compatibility_no_nfc.zip");
 
@@ -286,6 +320,7 @@ public class MainActivity extends AppCompatActivity {
         runcommand("rm -f storage/emulated/0/X01BD-StockRom-Patch/vendor.patch.dat");
         runcommand("rm -rf storage/emulated/0/X01BD-StockRom-Patch/firmware-update");
         runcommand("rm -f storage/emulated/0/X01BD-StockRom-Patch/boot.img");
+        runcommand("rm -f storage/emulated/0/X01BD-StockRom-Patch/file_contexts.bin");
         runcommand("rm -f storage/emulated/0/X01BD-StockRom-Patch/compatibility.zip");
         runcommand("rm -f storage/emulated/0/X01BD-StockRom-Patch/compatibility_no_nfc.zip");
 
@@ -298,22 +333,39 @@ public class MainActivity extends AppCompatActivity {
         runcommand("mv storage/emulated/0/X01BD-StockRom-Patch/zipfile.zip storage/emulated/0/X01BD-StockRom-Patch/Patched_" + filename);
         progressDialog.setProgress(99);
         progressDialog.setMessage("DONE");
-
         handler.postDelayed(() -> progressDialog.dismiss(), 2000);
 
         Uri selectedUri = Uri.parse(Environment.getExternalStorageDirectory() + "/X01BD-StockRom-Patch/");
         Intent intent = new Intent(Intent.ACTION_VIEW);
         intent.setDataAndType(selectedUri, "resource/folder");
 
-        if (intent.resolveActivityInfo(getPackageManager(), 0) != null) {
-            startActivity(intent);
-        } else {
-            extr.setVisibility(View.INVISIBLE);
-            handler.postDelayed(() -> path.setText("Default file explorer not found. Find the file from " + '"' + " X01BD-StockRom-Patch " + '"' + " folder in the internal storage"), 2000);
-            nextp.setVisibility(View.VISIBLE);
+        if (checkforfile("storage/emulated/0/X01BD-StockRom-Patch/Patched_" + filename)) {
 
+
+            if (intent.resolveActivityInfo(getPackageManager(), 0) != null) {
+                startActivity(intent);
+            } else {
+                extr.setVisibility(View.INVISIBLE);
+                handler.postDelayed(() -> path.setText("Default file explorer not found. Find the file from " + '"' + " X01BD-StockRom-Patch " + '"' + " folder in the internal storage"), 2000);
+                nextp.setVisibility(View.VISIBLE);
+
+            }
+        } else {
+            path.setText("Something went wrong, Please try again :(");
+            nextp.setVisibility(View.VISIBLE);
+            extr.setVisibility(View.INVISIBLE);
         }
 
+
+    }
+
+    private boolean checkforfile(String s) {
+
+        File file = new File(s);
+        if (file.exists())
+            return true;
+        else
+            return false;
 
     }
 
