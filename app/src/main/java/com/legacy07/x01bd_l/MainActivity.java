@@ -1,6 +1,7 @@
 package com.legacy07.x01bd_l;
 
 import android.Manifest;
+import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
 import android.app.Dialog;
@@ -21,6 +22,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.view.animation.AccelerateDecelerateInterpolator;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.widget.Button;
@@ -61,6 +63,24 @@ public class MainActivity extends AppCompatActivity {
 
         aniBlink = AnimationUtils.loadAnimation(getApplicationContext(), R.anim.blink);
         banner.startAnimation(aniBlink);
+
+        if (!android.os.Build.MODEL.contains("X01BD"))
+        {
+            path.setText("Unsupported Device !");
+            ObjectAnimator objectAnimator=new ObjectAnimator();
+            ObjectAnimator textViewAnimator = ObjectAnimator.ofFloat(findfile, "translationY",0f,500f);
+            textViewAnimator.setDuration(2000);
+            textViewAnimator.setInterpolator(new AccelerateDecelerateInterpolator());
+            textViewAnimator.start();
+            findfile.setText("Proceed Anyway !");
+
+                ObjectAnimator loopie1 = ObjectAnimator.ofFloat(path, "translationY", 0f, -500f);
+                loopie1.setDuration(2000);
+                loopie1.setInterpolator(new AccelerateDecelerateInterpolator());
+                loopie1.start();
+
+        }
+
         if (checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
             Log.v("permission", "Permission is granted");
             //File write logic here
