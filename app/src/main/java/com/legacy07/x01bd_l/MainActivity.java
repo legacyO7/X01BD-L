@@ -67,20 +67,27 @@ public class MainActivity extends AppCompatActivity {
         }
         isStoragePermissionGranted();
 
+        if (!isExternalStorageWritable())
+        {
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+            intent.putExtra("android.content.extra.SHOW_ADVANCED", true);
+            startActivityForResult(intent, 1);
+        }
+
+
+
         ActivityCompat.requestPermissions(MainActivity.this,
                 new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
                 PERMISSION_EXTERNAL_STORAGE);
 
         int ReadExternalStoragePermission = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE);
         Log.e("perm", "checkExternalStoragePermission() done");
-        if(ReadExternalStoragePermission== PackageManager.PERMISSION_GRANTED) {
+        if (ReadExternalStoragePermission == PackageManager.PERMISSION_GRANTED) {
             Log.e("perm", "ReadExternalStoragePermission() granted");
 
             //read my file in  /sdcard/test.csv
 
         }
-
-
         runcommand("rm -rf storage/emulated/0/X01BD-StockRom-Patch");
 
 
@@ -129,9 +136,9 @@ public class MainActivity extends AppCompatActivity {
 
 
         nextp.setOnClickListener(v -> {
-            Intent intent = new Intent(getApplicationContext(), MainActivity.class);
-            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            startActivity(intent);
+            Intent intent1 = new Intent(getApplicationContext(), MainActivity.class);
+            intent1.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            startActivity(intent1);
         });
     }
 
@@ -194,56 +201,54 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == FILE_SELECT_CODE) {
-            if (resultCode == RESULT_OK) {
-                // Get the Uri of the selected file
-                Uri uri = data.getData();
-                assert uri != null;
-                Log.d("path", "File Uri: " + uri.toString());
-                // Get the path
-                fpath = uri.getPath();
-                assert fpath != null;
-                backupfpath = fpath;
-                backupfpath = backupfpath.replace("/document/", "storage/");
-                backupfpath = backupfpath.replace(":", "/");
-                Log.d("real file path", "File Path: " + fpath);
-                if (fpath.contains(":")) {
-                    String currentpath = fpath;
-                    String[] separated = currentpath.split(":");
-                    fpath = separated[1];
-                }
 
-                if (!fpath.equals("")) {
-
-                    filename = fpath.substring(fpath.lastIndexOf("/") + 1);
-                    success = true;
-                    path.setVisibility(View.VISIBLE);
-                    path.setText(filename);
-                    StringBuilder s1 = new StringBuilder(500);
-                    s1.append("storage/emulated/0/");
-                    s1.append(fpath);
-                    fpath = s1.toString();
-
-                    if (!fpath.contains(".zip")) {
-                        StringBuilder s = new StringBuilder(500);
-                        s.append(fpath);
-                        s.append(".zip");
-                        fpath = s.toString();
+        switch (requestCode){
+            case 0:
+            {   if (resultCode == RESULT_OK) {
+                    // Get the Uri of the selected file
+                    Uri uri = data.getData();
+                    assert uri != null;
+                    Log.d("path", "File Uri: " + uri.toString());
+                    // Get the path
+                    fpath = uri.getPath();
+                    assert fpath != null;
+                    backupfpath = fpath;
+                    backupfpath = backupfpath.replace("/document/", "storage/");
+                    backupfpath = backupfpath.replace(":", "/");
+                    Log.d("real file path", "File Path: " + fpath);
+                    if (fpath.contains(":")) {
+                        String currentpath = fpath;
+                        String[] separated = currentpath.split(":");
+                        fpath = separated[1];
                     }
-                    Log.d("file path", "File Path: " + fpath);
+
+                    if (!fpath.equals("")) {
+
+                        filename = fpath.substring(fpath.lastIndexOf("/") + 1);
+                        success = true;
+                        path.setVisibility(View.VISIBLE);
+                        path.setText(filename);
+                        StringBuilder s1 = new StringBuilder(500);
+                        s1.append("storage/emulated/0/");
+                        s1.append(fpath);
+                        fpath = s1.toString();
+
+                        if (!fpath.contains(".zip")) {
+                            StringBuilder s = new StringBuilder(500);
+                            s.append(fpath);
+                            s.append(".zip");
+                            fpath = s.toString();
+                        }
+                        Log.d("file path", "File Path: " + fpath);
 
                         if (checkforfile(fpath)) {
-                            //  Log.d("file path", "File Path: " + runcommand("unzip -l " + fpath));
                             findfile.setVisibility(View.INVISIBLE);
                             extr.setVisibility(View.VISIBLE);
-                        }
-                        else if (checkforfile(backupfpath))
-                        {
-                            findfile.setVisibility(View.INVISIBLE);
-                            path.setText("Under development :(");
-                            nextp.setVisibility(View.VISIBLE);
-                        }
-                        else{
+                        } else if (checkforfile(backupfpath)) {
+
+                            ///
+
+                        } else {
                             Log.d("file path", "File Path: " + fpath);
                             Log.d("backupfile path", "File Path: " + backupfpath);
                             path.setText("Something went wrong. Unable to get the file path. Try a different location :(");
@@ -252,22 +257,44 @@ public class MainActivity extends AppCompatActivity {
                         }
 
 
-                } else {
-                    path.setText("Something went wrong :(");
-                }
+                    } else {
+                        path.setText("Something went wrong :(");
+                    }
 
-                // Get the file instance
-                // File file = new File(path);
-                // Initiate the upload
+                    // Get the file instance
+                    // File file = new File(path);
+                    // Initiate the upload
+                }
+            }break;
+            case 1:
+            {
+                if(resultCode==RESULT_OK){
+                    //Take persistant permission. This way you can modify the selected folder ever after a device restart.
+                    Uri treeUri = data.getData();
+                    int takeFlags = data.getFlags()  & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                    getContentResolver().takePersistableUriPermission(treeUri, takeFlags);
+                }
             }
+
         }
+
         super.onActivityResult(requestCode, resultCode, data);
     }
+
+    public boolean isExternalStorageWritable() {
+        String state = Environment.getExternalStorageState();
+        if (Environment.MEDIA_MOUNTED.equals(state)) {
+
+            return true;
+        }
+        return false;
+    }
+
 
     private void extractfile() {
         runcommand("unzip -o " + fpath + " -d storage/emulated/0/X01BD-StockRom-Patch");
         progressDialog.incrementProgressBy(20);
-        handler.postDelayed(() -> patch(), 1000);
+        handler.postDelayed(this::patch, 1000);
 
     }
 
@@ -291,7 +318,7 @@ public class MainActivity extends AppCompatActivity {
 
         }
 
-        handler.postDelayed(() -> compress(), 1500);
+        handler.postDelayed(this::compress, 1500);
 
     }
 
@@ -330,7 +357,11 @@ public class MainActivity extends AppCompatActivity {
     private void finishing() {
         progressDialog.setProgress(95);
         progressDialog.setMessage("Finishing up");
-        runcommand("mv storage/emulated/0/X01BD-StockRom-Patch/zipfile.zip storage/emulated/0/X01BD-StockRom-Patch/Patched_" + filename);
+        if (action == 1)
+            runcommand("mv storage/emulated/0/X01BD-StockRom-Patch/zipfile.zip storage/emulated/0/X01BD-StockRom-Patch/Patched_" + filename);
+        if (action == 2)
+            runcommand("mv storage/emulated/0/X01BD-StockRom-Patch/zipfile.zip storage/emulated/0/X01BD-StockRom-Patch/Firmware_" + filename);
+
         progressDialog.setProgress(99);
         progressDialog.setMessage("DONE");
         handler.postDelayed(() -> progressDialog.dismiss(), 2000);
@@ -339,14 +370,14 @@ public class MainActivity extends AppCompatActivity {
         Intent intent = new Intent(Intent.ACTION_VIEW);
         intent.setDataAndType(selectedUri, "resource/folder");
 
-        if (checkforfile("storage/emulated/0/X01BD-StockRom-Patch/Patched_" + filename)) {
+        if (checkforfile("storage/emulated/0/X01BD-StockRom-Patch/Patched_" + filename) || checkforfile("storage/emulated/0/X01BD-StockRom-Patch/Firmware_" + filename)) {
 
 
             if (intent.resolveActivityInfo(getPackageManager(), 0) != null) {
                 startActivity(intent);
             } else {
                 extr.setVisibility(View.INVISIBLE);
-                handler.postDelayed(() -> path.setText("Default file explorer not found. Find the file from " + '"' + " X01BD-StockRom-Patch " + '"' + " folder in the internal storage"), 2000);
+                handler.postDelayed(() -> path.setText("Default file explorer not set. Find the file from " + '"' + " X01BD-StockRom-Patch " + '"' + " folder in the internal storage"), 2000);
                 nextp.setVisibility(View.VISIBLE);
 
             }
