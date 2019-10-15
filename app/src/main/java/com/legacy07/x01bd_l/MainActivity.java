@@ -33,6 +33,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.Objects;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -49,6 +50,9 @@ public class MainActivity extends AppCompatActivity {
     Animation aniBlink;
     private String backupfpath;
     public static final int PERMISSION_EXTERNAL_STORAGE = 1;
+    String mode = "";
+    Bundle bundle;
+    String comtoexec = "su" + " " + "-c" + " " + '"' + '"' + "cd" + " " + "storage" + "/" + "emulated" + "/" + "0" + "/" + "X01BD-StockRom-Patch" + " " + "&&" + " " + "zip" + " " + "-r" + " " + "-b" + " " + "META-INF" + " " + "zipfile" + " " + "*" + '"' + '"';
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,24 +64,31 @@ public class MainActivity extends AppCompatActivity {
         nextp = findViewById(R.id.next);
         b = new AlertDialog.Builder(this, R.style.MyDialogTheme);
         banner = findViewById(R.id.legacy);
-
         aniBlink = AnimationUtils.loadAnimation(getApplicationContext(), R.anim.blink);
         banner.startAnimation(aniBlink);
+        Log.d("cmdtoexec",comtoexec);
+        bundle = new Bundle();
+        bundle = getIntent().getExtras();
+        if (bundle != null) {
+            mode = Objects.requireNonNull(bundle.getString("mode")).trim();
 
-        if (!android.os.Build.MODEL.contains("X01BD"))
-        {
+        }
+
+        if (mode.equals("ota"))
+            findfile.setText("Check OTA file");
+
+        if (!android.os.Build.MODEL.contains("X01BD")) {
             path.setText("Unsupported Device !");
-            ObjectAnimator objectAnimator=new ObjectAnimator();
-            ObjectAnimator textViewAnimator = ObjectAnimator.ofFloat(findfile, "translationY",0f,500f);
+            ObjectAnimator textViewAnimator = ObjectAnimator.ofFloat(findfile, "translationY", 0f, 500f);
             textViewAnimator.setDuration(2000);
             textViewAnimator.setInterpolator(new AccelerateDecelerateInterpolator());
             textViewAnimator.start();
             findfile.setText("Proceed Anyway !");
 
-                ObjectAnimator loopie1 = ObjectAnimator.ofFloat(path, "translationY", 0f, -500f);
-                loopie1.setDuration(2000);
-                loopie1.setInterpolator(new AccelerateDecelerateInterpolator());
-                loopie1.start();
+            ObjectAnimator loopie1 = ObjectAnimator.ofFloat(path, "translationY", 0f, -500f);
+            loopie1.setDuration(2000);
+            loopie1.setInterpolator(new AccelerateDecelerateInterpolator());
+            loopie1.start();
 
         }
 
@@ -87,14 +98,11 @@ public class MainActivity extends AppCompatActivity {
         }
         isStoragePermissionGranted();
 
-        if (!isExternalStorageWritable())
-        {
+        if (!isExternalStorageWritable()) {
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
             intent.putExtra("android.content.extra.SHOW_ADVANCED", true);
             startActivityForResult(intent, 1);
         }
-
-
 
         ActivityCompat.requestPermissions(MainActivity.this,
                 new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
@@ -119,7 +127,6 @@ public class MainActivity extends AppCompatActivity {
 
         findfile.setOnClickListener(v -> {
 
-
             File folder = new File(Environment.getExternalStorageDirectory() +
                     File.separator + "X01BD-StockRom-Patch");
             if (!folder.exists())
@@ -130,8 +137,33 @@ public class MainActivity extends AppCompatActivity {
                 path.setTextSize(20);
                 findfile.setVisibility(View.INVISIBLE);
                 extr.setVisibility(View.INVISIBLE);
-            } else
-                myOpenZipPicker();
+            } else {
+                if (!mode.equals("ota")) {
+                    myOpenZipPicker();
+                } else {
+                    findfile.setVisibility(View.GONE);
+                    if (checkforroot()) {
+                        fpath = "storage/emulated/0/";
+                        filename = "OTA_FIRMWARE_LEGACY.zip";
+                        String command = "su" + " " + "-c" + " " + '"'+'"' + "cp" + " " + "data" + "/" + "cache" + "/" + "recovery" + "/" + "dlpkgfile" + " " + "storage" + "/" + "emulated" + "/" + "0" + "/" + '"'+'"';
+                        runcommand(command);
+                        runcommand("mv storage/emulated/0/dlpkgfile storage/emulated/0/"+filename);
+
+                        if (checkforfile(fpath + filename)) {
+                            path.setText("OTA Found");
+                            extr.setVisibility(View.VISIBLE);
+                            fpath=fpath+filename;
+                        }
+                        else {
+                            path.setText("OTA not Found ;(");
+                            extr.setVisibility(View.GONE);
+                        }
+                    } else
+                        path.setText("Cant Access Root");
+                }
+
+            }
+
 
             b.setTitle("Select an Action")
                     .setNeutralButton("Extract Firmware", (dialog, which) -> action = 2)
@@ -162,18 +194,25 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    void checkroot() {
+    boolean checkforroot() {
         if (runcommand("su -c 'getenforce'").equals("")) {
             //progressDialog.dismiss();
             path.setText("Cant get root access. Process Failed to complete :(");
             findfile.setVisibility(View.INVISIBLE);
             extr.setVisibility(View.INVISIBLE);
+            return false;
+        } else
+            return true;
+    }
+
+    void checkroot() {
+
+        if (checkforroot()) {
+            progressDialog.setMessage("Extracting file");
+            progressDialog.incrementProgressBy(14);
+
+            handler.postDelayed(() -> extractfile(), 2000);
         }
-
-        progressDialog.setMessage("Extracting file");
-        progressDialog.incrementProgressBy(14);
-
-        handler.postDelayed(() -> extractfile(), 2000);
     }
 
     public void myOpenZipPicker() {
@@ -222,9 +261,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
 
-        switch (requestCode){
-            case 0:
-            {   if (resultCode == RESULT_OK) {
+        switch (requestCode) {
+            case 0: {
+                if (resultCode == RESULT_OK) {
                     // Get the Uri of the selected file
                     Uri uri = data.getData();
                     assert uri != null;
@@ -285,13 +324,13 @@ public class MainActivity extends AppCompatActivity {
                     // File file = new File(path);
                     // Initiate the upload
                 }
-            }break;
-            case 1:
-            {
-                if(resultCode==RESULT_OK){
+            }
+            break;
+            case 1: {
+                if (resultCode == RESULT_OK) {
                     //Take persistant permission. This way you can modify the selected folder ever after a device restart.
                     Uri treeUri = data.getData();
-                    int takeFlags = data.getFlags()  & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                    int takeFlags = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
                     getContentResolver().takePersistableUriPermission(treeUri, takeFlags);
                 }
             }
@@ -346,7 +385,6 @@ public class MainActivity extends AppCompatActivity {
 
         progressDialog.incrementProgressBy(18);
         progressDialog.setMessage("Compressing");
-        String comtoexec = "su" + " " + "-c" + " " + '"' + '"' + "cd" + " " + "storage" + "/" + "emulated" + "/" + "0" + "/" + "X01BD-StockRom-Patch" + " " + "&&" + " " + "zip" + " " + "-r" + " " + "-b" + " " + "META-INF" + " " + "zipfile" + " " + "*" + '"' + '"';
 
         Log.d("tag u r it!", comtoexec);
 
@@ -370,6 +408,7 @@ public class MainActivity extends AppCompatActivity {
         runcommand("rm -f storage/emulated/0/X01BD-StockRom-Patch/file_contexts.bin");
         runcommand("rm -f storage/emulated/0/X01BD-StockRom-Patch/compatibility.zip");
         runcommand("rm -f storage/emulated/0/X01BD-StockRom-Patch/compatibility_no_nfc.zip");
+        runcommand("rm -f storage/emulated/0/"+filename);
 
         handler.postDelayed(() -> finishing(), 1000);
     }
@@ -395,6 +434,7 @@ public class MainActivity extends AppCompatActivity {
 
             if (intent.resolveActivityInfo(getPackageManager(), 0) != null) {
                 startActivity(intent);
+                finish();
             } else {
                 extr.setVisibility(View.INVISIBLE);
                 handler.postDelayed(() -> path.setText("Default file explorer not set. Find the file from " + '"' + " X01BD-StockRom-Patch " + '"' + " folder in the internal storage"), 2000);
